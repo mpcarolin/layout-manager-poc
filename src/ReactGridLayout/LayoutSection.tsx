@@ -2,14 +2,14 @@ import React from "react";
 import GridLayout from "react-grid-layout";
 import styled from "styled-components";
 import { Item } from "./Item.tsx"
-import { useCoordinates } from "./useCoordinates.tsx";
+import { useLayout } from "../hooks/useLayout.tsx";
 import { nanoid } from "nanoid";
 
 const generateID = () => nanoid(2)
 
 const GridWidth = 500; 
 
-interface Field {
+export interface Field {
   id: string,
   title?: string
   width?: number
@@ -21,20 +21,8 @@ const GridRoot = styled.div`
   background-color: lightblue;
   margin: 15px;
   width: ${GridWidth}px;
+  cursor: pointer;
 `;
-
-const useLayout = (fields: Field[], numColumns: number) => {
-  const { next } = useCoordinates(numColumns);
-  return React.useMemo(() => fields.map(field => {
-    const [ x, y ] = next();
-    return {
-      x, y,
-      i: field.id,
-      w: field.width ?? 1,
-      h: field.height ?? 1
-    }
-  }), [ next, fields ]);
-}
 
 const AdjustButton = styled.button`
   margin: 5px;
@@ -60,7 +48,21 @@ const AttributeManager = ({
 }
 
 
-const LayoutSection = ({ fields = [], onFieldAdd, onFieldRemove, initialCols = 1 }: { fields: Field[], onFieldAdd: (field) => void, onFieldRemove?: (id) => void }) => {
+export const LayoutSection = React.forwardRef((props: {
+  title: string,
+  fields: Field[],
+  onFieldAdd: (field) => void,
+  onFieldRemove?: (id: string) => void
+  initialCols?: number
+}, ref: unknown) => {
+  const {
+    title,
+    fields = [],
+    onFieldAdd,
+    onFieldRemove,
+    initialCols = 1,
+    ...gridLayoutProps
+  } = props;
   const [ columns, setColumns ] = React.useState(initialCols);
 
   const layout = useLayout(fields, columns);
@@ -70,13 +72,18 @@ const LayoutSection = ({ fields = [], onFieldAdd, onFieldRemove, initialCols = 1
   console.log(currentLayout);
 
   return (
-    <GridRoot>
+    <GridRoot ref={ref} {...gridLayoutProps} className="draggable">
+      <b>Section:</b> { title }
       <GridLayout
         cols={columns}
         rowHeight={50}
         width={GridWidth}
         layout={layout}
         onLayoutChange={setLayout}
+        onDragStart={(a, b, c, d, e) => e.stopPropagation()}
+        onDragStop={(layout, oldItem, newItem, placeholder) => console.log("onDragStop", { layout, oldItem, newItem, placeholder })}
+        onDrop={() => console.log("onDrop")}
+        onDropDragOver={() => console.log("onDropDragOver")}
       >
         {
           fields.map(field =>
@@ -108,15 +115,5 @@ const LayoutSection = ({ fields = [], onFieldAdd, onFieldRemove, initialCols = 1
       </AdjustButton>
     </GridRoot>
   );
-}
-
-export function LayoutManager({ fields, setFields, setShowForm }) {
-  return (
-    <LayoutSection
-      onFieldAdd={() => setShowForm(true)}
-      onFieldRemove={field => setFields(fields.filter(f => f.id !== field.id))}
-      fields={fields}
-    />
-  );
-}
+});
 
