@@ -11,6 +11,7 @@ const GridWidth = 500;
 
 interface Field {
   id: string,
+  title?: string
   width?: number
   height?: number
 }
@@ -83,6 +84,9 @@ const LayoutSection = ({ fields = [], onFieldAdd, onFieldRemove, initialCols = 1
               key={field.id}
               onRemove={() => onFieldRemove(field.id)}
             >
+              <b> Title: </b>
+             {field.title}
+              <b> ID: </b>
               {field.id}
             </Item>
           )
@@ -97,21 +101,19 @@ const LayoutSection = ({ fields = [], onFieldAdd, onFieldRemove, initialCols = 1
         type="Field"
         onAdd={() => onFieldAdd({ id: generateID() })}
       />
+      <AdjustButton
+        onClick={() => console.log(JSON.stringify(currentLayout, null, 2)) || alert("Printed to console")}
+      >
+        Export
+      </AdjustButton>
     </GridRoot>
   );
 }
 
-export function LayoutManager() {
-  // id needs to be string for react grid keys for some reason
-  const data = Array(4)
-    .fill(null)
-    .map(() => ({ id: generateID() }));
-
-  const [ fields, setFields ] = React.useState(data);
-
+export function LayoutManager({ fields, setFields, setShowForm }) {
   return (
     <LayoutSection
-      onFieldAdd={field => setFields([...fields, field])}
+      onFieldAdd={() => setShowForm(true)}
       onFieldRemove={field => setFields(fields.filter(f => f.id !== field.id))}
       fields={fields}
     />
