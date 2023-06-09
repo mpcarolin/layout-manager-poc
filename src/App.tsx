@@ -7,10 +7,12 @@ import { getNextGridCoordinate } from "./hooks/useCoordinates.tsx"
 
 const buildField = ({
   title = "N/A",
-  id = nanoid(2),
+  isSpacer = false,
+  id = nanoid(3),
   x = 0,
-  y = 0
+  y = 0,
 }: {
+  isSpacer?: boolean
   title?: string,
   id?: string,
   x?: number,
@@ -19,14 +21,18 @@ const buildField = ({
   x,
   y,
   title,
+  isSpacer,
   id
 })
+
+const buildSpacer = ({ x, y }) => buildField({ title: "(spacer)", isSpacer: true, x, y });
 
 interface Section {
   id: string
   title: string
   fields: Field[]
   columnCount: number
+  rowCount: number
 }
 
 export interface Field {
@@ -36,6 +42,7 @@ export interface Field {
   title?: string
   width?: number
   height?: number
+  isSpacer?: boolean
 }
 
 
@@ -53,27 +60,57 @@ const SectionList = styled.div`
   flex-direction: column;
 ` 
 
-const buildSection = ({ title, columnCount = 1, fields = Array(3).fill({}) }): Section => {
+const buildSection = ({ title, columnCount = 1, rowCount = 1, fields = [] }: Section): Section => {
+  console.log({ title, columnCount, rowCount, fields });
   const id = nanoid(3);
 
-  const iterator = getNextGridCoordinate(columnCount);
+  const regularFieldIterator = getNextGridCoordinate(columnCount, rowCount);
+
+  const regularFields = fields.filter(field => !field.isSpacer && field.x <= columnCount - 1 && field.y <= rowCount - 1);
+  const maxY = Math.max(rowCount - 1, ...regularFields.map(field => field.y));
+  const maxX = Math.max(columnCount - 1, ...regularFields.map(field => field.x));
+
+
+  const processedFields = regularFields.map(field => {
+    const [ x, y ] = regularFieldIterator.next().value;
+    return buildField({ ...field, x, y });
+  });
+
+  // Add spacers to ensure we can still drag and drop over "empty" spots in grid
+  let x = 0;
+  let y = 0;
+  const increment = () => {
+    if (x < maxX) {
+      x++;
+    } else {
+      x = 0;
+      y++;
+    }
+  };
+  const fieldExistsAt = (x, y) => regularFields.find(field => field.x === x && field.y === y);
+  while (x <= maxX && y <= maxY) {
+    console.log({ x, y, maxX, maxY })
+    if (fieldExistsAt(x, y)) {
+      increment();
+      continue;
+    }
+    processedFields.push(buildSpacer({ x, y }))
+    increment();
+  }
 
   return {
     title,
     id,
     columnCount,
-    fields: fields.map(field => {
-      const [ x, y ] = iterator.next().value;
-      return buildField({ ...field, x, y });
-    }),
+    rowCount,
+    fields: processedFields,
   }
 }
 
 
 function App() {
   const [ sections, setSections ] = React.useState<Section[]>([
-    buildSection({ title: "Foo", columnCount: 2 }),
-    //buildSection({ title: "Bar" })
+    buildSection({ title: "Foo", columnCount: 2, rowCount: 2 }),
   ]);
 
   console.log(sections[0].fields)
@@ -92,9 +129,7 @@ function App() {
   } 
 
   const setFields = (sectionId: string) => (fields: Field[] | ((fields: Field[]) => Field[])) => {
-    const fieldsSetter = typeof fields === "function"
-      ? fields
-      : () => fields;
+    const fieldsSetter = typeof fields === "function" ? fields : () => fields;
 
     updateSection(
       sectionId,
@@ -109,14 +144,42 @@ function App() {
 
     updateSection(
       sectionId,
-      (section: Section) => ({ ...section, columnCount: countSetter(section.columnCount)})
+      (section: Section) => {
+        const nextCount = countSetter(section.columnCount);
+        const sectionProps = {
+          ...section,
+          columnCount: nextCount,
+        };
+        return buildSection(sectionProps);
+      }
+    )
+  }
+
+  const setRowCount = (sectionId: string) => (count: number | ((currentCount: number) => number)) => {
+    const countSetter = typeof count === "function"
+      ? count
+      : () => count;
+
+    updateSection(
+      sectionId,
+      (section: Section) => {
+        const nextCount = countSetter(section.rowCount);
+        const sectionProps = {
+          ...section,
+          rowCount: nextCount,
+        };
+        return buildSection(sectionProps);
+      }
     )
   }
 
   const onFieldSubmit = (field: Field) => {
     setSectionFormId(null);
-    if (!field) return;
-    setFields(sectionFormId)((fields: Field[]) => [ ...fields, field ]);
+    if (!field || !sectionFormId) return;
+    updateSection(
+      sectionFormId,
+      section => buildSection({ ...section, fields: [ ...section.fields, buildField(field) ] })
+    );
   }
 
   return (
@@ -132,10 +195,11 @@ function App() {
         sections.map(section => <LayoutSection 
           key={section.id}
           style={{ marginBottom: 15 }}
-          {...section}
           onRequestFieldAdd={() => setSectionFormId(section.id)}
           setFields={setFields(section.id)}
           setColumnCount={setColumnCount(section.id)}
+          setRowCount={setRowCount(section.id)}
+          {...section}
         />)
       }
       </SectionList>

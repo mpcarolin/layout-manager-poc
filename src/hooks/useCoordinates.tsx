@@ -1,10 +1,10 @@
 import React from "react";
 
 
-export function* getNextGridCoordinate(numColumns: number): IterableIterator<[number, number]> {
+export function* getNextGridCoordinate(numColumns: number, rowCount: number = 1): IterableIterator<[number, number]> {
   let x = 0;
   let y = 0;
-  while (true) {
+  while (y < rowCount) {
     yield [ x, y ];
     if (x < (numColumns - 1)) {
       x++;

@@ -10,7 +10,12 @@ const Wrapper = styled("div")`
   background-color: coral;
 `;
 
-export const Item = ({ id, title }) => {
+const InvisibleWrapper = styled(Wrapper)`
+  background-color: transparent;
+  cursor: auto;
+`;
+
+export const Item = ({ id, title, x, y, isSpacer }) => {
   const {
     attributes,
     listeners,
@@ -21,21 +26,25 @@ export const Item = ({ id, title }) => {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition
+    transition,
+    gridColumnStart: x + 1,
+    gridRowStart: y + 1,
   }
 
+  const Wrap = isSpacer ? InvisibleWrapper : Wrapper;
+
   return (
-    <Wrapper
+    <Wrap
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
     >
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <b>{ title }</b>
-        { id }
+      <div style={{ display: "flex", flexDirection: "column", height: 40 }}>
+        <b>{ !isSpacer && title }</b>
+        { !isSpacer && id }
       </div>
-    </Wrapper>
+    </Wrap>
   );
 }
 
