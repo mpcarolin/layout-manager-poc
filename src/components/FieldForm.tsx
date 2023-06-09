@@ -18,7 +18,7 @@ export const FieldForm = ({ onSubmit }) => {
   const [ title, setTitle ] = React.useState("");
   return <FieldFormWrapper>
     <span>
-      <label for="title">Title</label>
+      <label htmlFor="title">Title</label>
       <input 
         style={{ marginLeft: 15, width: "50%" }}
         id="title"

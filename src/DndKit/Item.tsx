@@ -5,11 +5,12 @@ import { useSortable } from '@dnd-kit/sortable';
 const Wrapper = styled("div")`
   width: 100px;
   cursor: pointer;
-  border: 1px solid black;
-  padding: 15px;
+  border: 2px solid blue;
+  padding: 5px;
+  background-color: coral;
 `;
 
-export const SortableItem = ({ id }) => {
+export const Item = ({ id, title }) => {
   const {
     attributes,
     listeners,
@@ -30,7 +31,10 @@ export const SortableItem = ({ id }) => {
       {...attributes}
       {...listeners}
     >
-      { id }
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <b>{ title }</b>
+        { id }
+      </div>
     </Wrapper>
   );
 }

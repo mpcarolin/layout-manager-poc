@@ -1,6 +1,7 @@
 import React from "react";
 import GridLayout from "react-grid-layout";
 import styled from "styled-components";
+import { Field } from "../App.tsx"
 import { Item } from "./Item.tsx"
 import { useLayout } from "../hooks/useLayout.tsx";
 import { nanoid } from "nanoid";
@@ -8,13 +9,6 @@ import { nanoid } from "nanoid";
 const generateID = () => nanoid(2)
 
 const GridWidth = 500; 
-
-export interface Field {
-  id: string,
-  title?: string
-  width?: number
-  height?: number
-}
 
 const GridRoot = styled.div`
   border: 2px solid blue;

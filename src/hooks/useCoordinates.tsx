@@ -1,7 +1,7 @@
 import React from "react";
 
 
-function* getNextGridCoordinate(numColumns: number): IterableIterator<[number, number]> {
+export function* getNextGridCoordinate(numColumns: number): IterableIterator<[number, number]> {
   let x = 0;
   let y = 0;
   while (true) {

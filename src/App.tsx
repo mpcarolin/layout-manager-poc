@@ -1,18 +1,43 @@
 import React from "react";
-import GridLayout from "react-grid-layout";
 import { FieldForm } from "./components/FieldForm.tsx"
-import { LayoutSection, Field  } from "./ReactGridLayout/LayoutSection.tsx"
+import { LayoutSection } from "./DndKit/LayoutSection.tsx"
 import { nanoid } from "nanoid";
-import { useLayout, LayoutItem } from "./hooks/useLayout.tsx"
 import styled from "styled-components";
+import { getNextGridCoordinate } from "./hooks/useCoordinates.tsx"
 
-const buildField = ({ title = "N/A", id = nanoid(2) } = {}) => ({ title, id })
+const buildField = ({
+  title = "N/A",
+  id = nanoid(2),
+  x = 0,
+  y = 0
+}: {
+  title?: string,
+  id?: string,
+  x?: number,
+  y?: number
+} = {}) => ({
+  x,
+  y,
+  title,
+  id
+})
 
-interface Section extends LayoutItem {
+interface Section {
   id: string
   title: string
   fields: Field[]
+  columnCount: number
 }
+
+export interface Field {
+  id: string,
+  x: number,
+  y: number,
+  title?: string
+  width?: number
+  height?: number
+}
+
 
 const AppRoot = styled.div`
   border: 2px solid black;
@@ -20,38 +45,79 @@ const AppRoot = styled.div`
   margin: 15px;
   width: 900px;
   height: 1000px;
+  padding: 15px;
 `;
+
+const SectionList = styled.div`
+  display: flex;
+  flex-direction: column;
+` 
+
+const buildSection = ({ title, columnCount = 1, fields = Array(3).fill({}) }): Section => {
+  const id = nanoid(3);
+
+  const iterator = getNextGridCoordinate(columnCount);
+
+  return {
+    title,
+    id,
+    columnCount,
+    fields: fields.map(field => {
+      const [ x, y ] = iterator.next().value;
+      return buildField({ ...field, x, y });
+    }),
+  }
+}
+
 
 function App() {
   const [ sections, setSections ] = React.useState<Section[]>([
-    {
-      title: "Foo",
-      id: nanoid(3),
-      fields: Array(3).fill(null).map(() => buildField())
-    },
-    {
-      title: "Bar",
-      id: nanoid(3),
-      fields: Array(3).fill(null).map(() => buildField())
-    }
+    buildSection({ title: "Foo", columnCount: 2 }),
+    //buildSection({ title: "Bar" })
   ]);
 
-  const rootLayout = useLayout(sections, 1);
-  console.log({rootLayout})
+  console.log(sections[0].fields)
 
-  const [ sectionFormId, setSectionFormId ] = React.useState(null);
+  const [ sectionFormId, setSectionFormId ] = React.useState<string | null>(null);
+
+  const updateSection = (sectionId: string, sectionSetter: (section: Section) => Section) => {
+    const index = sections.findIndex(section => section.id === sectionId);
+    if (index < 0) throw new Error("No section!" + sectionId);
+    setSections(
+      sections.with(
+        index,
+        sectionSetter(sections[index])
+      )
+    );
+  } 
+
+  const setFields = (sectionId: string) => (fields: Field[] | ((fields: Field[]) => Field[])) => {
+    const fieldsSetter = typeof fields === "function"
+      ? fields
+      : () => fields;
+
+    updateSection(
+      sectionId,
+      (section: Section) => ({ ...section, fields: fieldsSetter(section.fields) })
+    );
+  }
+
+  const setColumnCount = (sectionId: string) => (count: number | ((currentCount: number) => number)) => {
+    const countSetter = typeof count === "function"
+      ? count
+      : () => count;
+
+    updateSection(
+      sectionId,
+      (section: Section) => ({ ...section, columnCount: countSetter(section.columnCount)})
+    )
+  }
 
   const onFieldSubmit = (field: Field) => {
     setSectionFormId(null);
     if (!field) return;
-
-    const idx = sections.findIndex(section => section.id === sectionFormId);
-    const newSections = [ ...sections ];
-    const section = newSections[idx];
-    newSections[idx].fields = [ ...section.fields, field ];
-    setSections(newSections);
+    setFields(sectionFormId)((fields: Field[]) => [ ...fields, field ]);
   }
-
 
   return (
     <AppRoot>
@@ -61,24 +127,18 @@ function App() {
           onSubmit={onFieldSubmit}
         />
       }
-      <GridLayout
-        cols={1}
-        rowHeight={300}
-        width={600}
-        layout={rootLayout}
-      >
+      <SectionList>
       {
-        sections.map(section => (
-          <LayoutSection
-            title={section.title}
-            key={section.id}
-            id={section.id}
-            fields={section.fields}
-            onFieldAdd={() => setSectionFormId(section.id)}
-          />
-        ))
+        sections.map(section => <LayoutSection 
+          key={section.id}
+          style={{ marginBottom: 15 }}
+          {...section}
+          onRequestFieldAdd={() => setSectionFormId(section.id)}
+          setFields={setFields(section.id)}
+          setColumnCount={setColumnCount(section.id)}
+        />)
       }
-      </GridLayout>
+      </SectionList>
     </AppRoot>
   );
 }
