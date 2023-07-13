@@ -7,7 +7,7 @@ const Wrapper = styled.div`
   border: solid 2px;
   background-color: white;
   cursor: pointer;
-  margin: 15px;
+  margin-top: 15px;
   padding: 15px;
   z-index: 1;
   &:active {
@@ -31,7 +31,7 @@ export const SortableItem = props => {
 
   return (
     <Wrapper ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      Sortable { props.id }
+      { props.id }
     </Wrapper>
   )
 }
