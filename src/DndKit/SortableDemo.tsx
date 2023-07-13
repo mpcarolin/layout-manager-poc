@@ -8,6 +8,8 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 
+import { nanoid } from "nanoid";
+
 import { useMultipleContainerCollisionDetectionStrategy } from "./useMultipleContainerCollisionDetection.ts";
 
 import {
@@ -18,7 +20,7 @@ import {
 
 import { SortableItem } from "./SortableItem.tsx";
 
-const Column = ({ items, name }) => {
+const Column = ({ items, name, onRemoveClick, onAddItem }) => {
   const { setNodeRef } = useDroppable({ id: name })
   const style = {
     border: "solid 2px",
@@ -33,7 +35,11 @@ const Column = ({ items, name }) => {
       strategy={verticalListSortingStrategy}
     >
       <div ref={setNodeRef} style={style}>
-        { name }
+        <span>
+          <b style={{ marginRight: 5 }}>{ name }</b>
+          <button onClick={onRemoveClick}>X</button>
+          <button onClick={onAddItem}>+</button>
+        </span>
         { items.map(id => <SortableItem key={id} id={id} />) }
       </div>
     </SortableContext>
@@ -199,6 +205,38 @@ const useColumns = () => {
     }
   }
 
+  /**
+   *
+   * Public Helpers
+   *
+   */
+  const addColumn = () => {
+    const columnIds = Object.keys(columns);
+    const lastColumnId = columnIds[columnIds.length - 1];
+
+    const nextColumnId = String.fromCharCode(lastColumnId.charCodeAt(0) + 1);
+
+    setColumns(columns => ({
+      ...columns,
+      [nextColumnId]: []
+    }))
+  }
+
+  const removeColumn = (id: string) => () => setColumns(columns => {
+    const { [id]: removedColumn, ...remainingColumns } = columns;
+    return remainingColumns;
+  });
+
+  const addItem = (columnId: string) => () => {
+    setColumns(columns => ({
+      ...columns,
+      [columnId]: [
+        ...columns[columnId],
+        `${columnId}:${nanoid(4)}`
+      ],
+    }))
+  }
+
 
   return {
     columns,
@@ -211,18 +249,27 @@ const useColumns = () => {
     handleDragEnd,
     handleDragOver,
 
+    // public helpers
+    addColumn,
+    removeColumn,
+    addItem,
+
     activeId,
-    setActiveId,
     recentlyMovedToNewContainerRef,
     isSortingContainer,
   }
 }
 
-export const SortableDemo = (props) => {
+export const SortableDemo = props => {
   const sensors = useSensors(useSensor(PointerSensor));
 
   const {
     columns,
+
+    // helpers
+    addColumn,
+    removeColumn,
+    addItem,
 
     // lifecycles
     handleDragStart,
@@ -230,9 +277,7 @@ export const SortableDemo = (props) => {
     handleDragOver,
 
     activeId,
-    setActiveId,
     recentlyMovedToNewContainerRef,
-    isSortingContainer
   } = useColumns();
 
   React.useEffect(() => {
@@ -259,10 +304,13 @@ export const SortableDemo = (props) => {
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
     >
+      <button onClick={addColumn}>+ Column</button>
       <div style={{ display: "flex", flexDirection: "row" }}>
         {
           Object.entries(columns).map(([ name, items ]) => (
             <Column
+              onRemoveClick={removeColumn(name)}
+              onAddItem={addItem(name)}
               items={items}
               name={name}
               key={name}
