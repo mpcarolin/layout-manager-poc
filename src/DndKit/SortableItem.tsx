@@ -6,7 +6,6 @@ import styled from "styled-components";
 const Wrapper = styled.div`
   border: solid 2px;
   background-color: white;
-  cursor: pointer;
   margin-top: 15px;
   padding: 15px;
   z-index: 1;
@@ -15,14 +14,14 @@ const Wrapper = styled.div`
   }
 `
 
-export const SortableItem = props => {
+export const SortableItem = ({ id, onRemoveClick }) => {
   const {
     attributes,
     listeners,
     setNodeRef,
     transform,
     transition
-  } = useSortable({ id: props.id });
+  } = useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -30,8 +29,12 @@ export const SortableItem = props => {
   }
 
   return (
-    <Wrapper ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      { props.id }
+    <Wrapper ref={setNodeRef} style={style} {...attributes}>
+      <b>{ id }</b>
+      <span style={{ display: "flex", flexDirection: "row" }}>
+        <div style={{ cursor: "grab", border: "solid 1px black", marginRight: 5, backgroundColor: "yellow" }} {...listeners}>(grab me)</div>
+        { onRemoveClick && <button onClick={onRemoveClick?.(id)} style={{ marginRight: 5 }}>X</button> }
+      </span>
     </Wrapper>
   )
 }

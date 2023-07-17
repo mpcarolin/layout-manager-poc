@@ -1,50 +1,15 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, SyntheticEvent } from "react";
 import {
   DndContext,
   MeasuringStrategy,
   PointerSensor,
   useSensor,
   useSensors,
-  useDroppable,
 } from "@dnd-kit/core";
-
+import { arrayMove } from "@dnd-kit/sortable";
 import { nanoid } from "nanoid";
-
 import { useMultipleContainerCollisionDetectionStrategy } from "./useMultipleContainerCollisionDetection.ts";
-
-import {
-  arrayMove,
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-
-import { SortableItem } from "./SortableItem.tsx";
-
-const Column = ({ items, name, onRemoveClick, onAddItem }) => {
-  const { setNodeRef } = useDroppable({ id: name })
-  const style = {
-    border: "solid 2px",
-    //backgroundColor: isOver ? "orange" : "green",
-    margin: 15,
-    padding: 15
-  };
-
-  return (
-    <SortableContext
-      items={items}
-      strategy={verticalListSortingStrategy}
-    >
-      <div ref={setNodeRef} style={style}>
-        <span>
-          <b style={{ marginRight: 5 }}>{ name }</b>
-          <button onClick={onRemoveClick}>X</button>
-          <button onClick={onAddItem}>+</button>
-        </span>
-        { items.map(id => <SortableItem key={id} id={id} />) }
-      </div>
-    </SortableContext>
-  );
-}
+import { Column } from "./Column.tsx";
 
 interface DndObject {
   id: string
@@ -84,13 +49,13 @@ const useColumns = () => {
   // this guy might be able to simplify/replace complex logic in handleDragEnd, but for now sticking w/ dndkit story code
   const setColumnItems = (
     columnKey: string,
-    items: string[] | ((items: string[]) => string[])
+    items: string[] | ((items: string[]) => Columns)
   ) => {
     setColumns(columns => ({
       ...columns,
       [columnKey]: typeof items === "function"
         ? items(columns[columnKey])
-        : items
+        : ({ ...columns, [columnKey]: items })
     }))
   }
 
@@ -237,6 +202,14 @@ const useColumns = () => {
     }))
   }
 
+  // TODO: make currying / partial using lodash...
+  const removeItem = (columnId: string) => (itemId: string) => (event: SyntheticEvent) => {
+    event.stopPropagation();
+    setColumns(columns => ({
+      ...columns,
+      [columnId]: columns[columnId].filter(id => id !== itemId)
+    }));
+  }
 
   return {
     columns,
@@ -253,6 +226,7 @@ const useColumns = () => {
     addColumn,
     removeColumn,
     addItem,
+    removeItem,
 
     activeId,
     recentlyMovedToNewContainerRef,
@@ -260,7 +234,7 @@ const useColumns = () => {
   }
 }
 
-export const SortableDemo = props => {
+export const LayoutManager = ({ title }) => {
   const sensors = useSensors(useSensor(PointerSensor));
 
   const {
@@ -269,6 +243,7 @@ export const SortableDemo = props => {
     // helpers
     addColumn,
     removeColumn,
+    removeItem,
     addItem,
 
     // lifecycles
@@ -280,6 +255,7 @@ export const SortableDemo = props => {
     recentlyMovedToNewContainerRef,
   } = useColumns();
 
+  // I can't tell what this is for. Seems to work fine without it?
   React.useEffect(() => {
     requestAnimationFrame(() => {
       recentlyMovedToNewContainerRef.current = false;
@@ -295,8 +271,6 @@ export const SortableDemo = props => {
 
   return (
     <DndContext
-      // Determines when a draggable is considered "over" a droppable
-      // this is th recommended algorithm for sortable lists, because it is more forgiving (i.e. triggers "over" sooner than default)
       collisionDetection={collisionStrategy} 
       measuring={{ droppable: { strategy: MeasuringStrategy.Always, } }}
       sensors={sensors}
@@ -304,12 +278,14 @@ export const SortableDemo = props => {
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
     >
+      <p><b>{ title }</b></p>
       <button onClick={addColumn}>+ Column</button>
       <div style={{ display: "flex", flexDirection: "row" }}>
         {
           Object.entries(columns).map(([ name, items ]) => (
             <Column
               onRemoveClick={removeColumn(name)}
+              onRemoveItem={removeItem(name)}
               onAddItem={addItem(name)}
               items={items}
               name={name}

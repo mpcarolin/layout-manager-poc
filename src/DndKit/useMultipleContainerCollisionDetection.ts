@@ -15,6 +15,8 @@ import {
  * - If there are none, find intersecting containers with the active draggable.
  * - If there are no intersecting containers, return the last matched intersection
  *
+ * This is taken mostly verbatim from the dndkit multiple containers story, but made into
+ * a custom hook and w/ some variables renamed for my own sanity
  */
 export const useMultipleContainerCollisionDetectionStrategy = ({
   activeId,
