@@ -1,6 +1,6 @@
 import React from "react";
 import styled from "styled-components";
-import { SortableDemo } from "./DndKit/SortableDemo.tsx";
+import { LayoutManager  } from "./DndKit/LayoutManager.tsx";
 
 const AppRoot = styled.div`
   border: 2px solid black;
@@ -19,7 +19,7 @@ const SectionList = styled.div`
 function App() {
   return (
     <AppRoot>
-      <SortableDemo />
+      <LayoutManager title="test" />
     </AppRoot>
   );
 }
