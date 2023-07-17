@@ -11,10 +11,6 @@ const AppRoot = styled.div`
   padding: 15px;
 `;
 
-const SectionList = styled.div`
-  display: flex;
-  flex-direction: column;
-` 
 
 function App() {
   return (
