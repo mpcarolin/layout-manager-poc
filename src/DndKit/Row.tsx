@@ -5,7 +5,6 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DndObject
 } from "@dnd-kit/core";
 
 // section
@@ -17,8 +16,8 @@ import { Column } from "./Column.tsx";
 import { Grabber } from "./Grabber.tsx";
 
 interface DragEvent {
-  active: DndObject
-  over: DndObject
+  active: any
+  over: any
 }
 
 interface Columns {
@@ -47,8 +46,6 @@ const useColumns = () => {
   const columnNames = new Set<string | undefined>(Object.keys(columns));
   const isSortingContainer = activeId ? columnNames.has(activeId) : false;
 
-  const [ clonedColumns, setClonedItems ] = useState<Columns | null>(null);
-
   /**
    *
    * Hook private helpers 
@@ -75,12 +72,21 @@ const useColumns = () => {
    */
   const handleDragStart = ({ active }: DragEvent) => {
     setActiveId(active.id);
-    setClonedItems(columns);
   }
 
-  const handleDragEnd = ({active, over}) => {
+  // Callback that runs when user lets go of mouse button after dragging
+  // a draggable somewhere. By the time this runs, both active and over should
+  // either be items in the same column, or over is not an item at all.
+  //
+  // This callback is really only meaningful when moving elements within the
+  // same column. You can replace this with an empty function, and the POC
+  // will still work for moving items between columns, but it will bug out 
+  // when moving an item within the same column.
+  const handleDragEnd = ({active, over}: DragEvent) => {
+    // find the column in which the active element currently resides
     const activeColumnId = findContainingColumn(active.id);
 
+    // if either columns do not exist, then just short circuit out
     if (!activeColumnId)
       return setActiveId(null);
 
@@ -91,6 +97,8 @@ const useColumns = () => {
 
     const overContainer = findContainingColumn(overId);
 
+    // If both columns exist, and the destination is a new index for the active item,
+    // then swap those two items.
     if (overContainer) {
       const activeIndex = columns[activeColumnId].indexOf(active.id);
       const overIndex = columns[overContainer].indexOf(overId);
@@ -111,6 +119,13 @@ const useColumns = () => {
   }
 
 
+  // Callback that runs as the user is dragging a draggable over another element
+  // tracked by the dnd context. This actually updates the state so that 
+  // the active element resides in the "over" container while dragging.
+  //
+  // This is only meaningful when moving elements to a different column. If you replace
+  // this with an empty function, the POC will work fine for moving items within the 
+  // same column, btu bug out when moving to a different one.
   const handleDragOver = ({ active, over }: DragEvent) => {
     const overId = over?.id;
 
@@ -153,6 +168,7 @@ const useColumns = () => {
 
         return {
           ...columns,
+          // remove the item from its previous container
           [activeColumn]: columns[activeColumn].filter(item => item && item !== active.id),
           // in the new column, place the moved item to the right index
           [overColumn]: [
@@ -194,9 +210,7 @@ const useColumns = () => {
     }))
   }
 
-  // TODO: make currying / partial using lodash...
   const removeItem = (columnId: string) => (itemId: string) => (event: SyntheticEvent) => {
-    event.stopPropagation();
     setColumns(columns => ({
       ...columns,
       [columnId]: columns[columnId].filter(id => id !== itemId)
@@ -207,7 +221,6 @@ const useColumns = () => {
     columns,
     columnNames,
     setColumns,
-    clonedColumns,
 
     // lifecycles
     handleDragStart,
