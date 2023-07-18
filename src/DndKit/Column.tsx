@@ -14,6 +14,7 @@ export const Column = ({ items, name, onRemoveClick, onAddItem, onRemoveItem }) 
   const { setNodeRef } = useDroppable({ id: name })
   const style = {
     border: "solid 2px",
+    backgroundColor: "skyblue",
     margin: 15,
     padding: 15
   };
