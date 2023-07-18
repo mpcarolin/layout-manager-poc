@@ -1,6 +1,7 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Grabber } from "./Grabber.tsx";
 import styled from "styled-components";
 
 const Wrapper = styled.div`
@@ -32,7 +33,7 @@ export const SortableItem = ({ id, onRemoveClick }) => {
     <Wrapper ref={setNodeRef} style={style} {...attributes}>
       <b>{ id }</b>
       <span style={{ display: "flex", flexDirection: "row" }}>
-        <div style={{ cursor: "grab", border: "solid 1px black", marginRight: 5, backgroundColor: "yellow" }} {...listeners}>(grab me)</div>
+        <Grabber title="Move Item" {...listeners} />
         { onRemoveClick && <button onClick={onRemoveClick?.(id)} style={{ marginRight: 5 }}>X</button> }
       </span>
     </Wrapper>

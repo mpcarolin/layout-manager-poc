@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/sortable";
 
 import { arrayMove } from "@dnd-kit/sortable";
-import { useSectionListCollisionDetectionStrategy } from "./collisionDetectionStrategies.ts";
+import { useBasicSortableCollisionStrategy } from "./collisionDetectionStrategies.ts";
 
 
 const useSections = () => {
@@ -67,7 +67,7 @@ const useSections = () => {
 
 export const LayoutManager = () => {
   const sensors = useSensors(useSensor(PointerSensor));
-  const collisionStrategy = useSectionListCollisionDetectionStrategy();
+  const collisionStrategy = useBasicSortableCollisionStrategy();
 
   const {
     sections,

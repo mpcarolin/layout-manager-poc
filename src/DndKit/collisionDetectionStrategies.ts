@@ -8,7 +8,7 @@ import {
   UniqueIdentifier,
 } from "@dnd-kit/core";
 
-export const useSectionListCollisionDetectionStrategy = () => closestCenter;
+export const useBasicSortableCollisionStrategy = () => closestCenter;
 
 /**
  * Custom collision detection strategy optimized for multiple containers
