@@ -240,23 +240,16 @@ const useColumns = () => {
 }
 
 
-export const Row = ({ id, onRemoveClick, }) => {
-  const sensors = useSensors(useSensor(PointerSensor));
+export const Row = ({
+  id,
+  columns,
 
-  const {
-    columns,
-    activeId,
-    recentlyMovedToNewContainerRef,
-    
-    handleDragStart,
-    handleDragEnd,
-    handleDragOver,
-
-    addColumn,
-    removeColumn,
-    addItem,
-    removeItem,
-  } = useColumns();
+  onRemoveClick,
+  onAddColumn,
+  onRemoveColumn,
+  onAddItem,
+  onRemoveItem,
+}) => {
 
   const {
     attributes,
@@ -266,18 +259,6 @@ export const Row = ({ id, onRemoveClick, }) => {
     transition
   } = useSortable({ id });
 
-  const collisionStrategy = useMultipleContainerCollisionDetectionStrategy({
-    activeId,
-    recentlyMovedToNewContainerRef,
-    items: columns
-  });
-
-  // I can't tell what this is for. Seems to work fine without it? Maybe a performance optimization?
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      recentlyMovedToNewContainerRef.current = false;
-    });
-  }, [columns, recentlyMovedToNewContainerRef ]);
 
   const style = {
     backgroundColor: "tan",
@@ -290,25 +271,16 @@ export const Row = ({ id, onRemoveClick, }) => {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <button onClick={addColumn}>+ Column</button>
+      <button onClick={onAddColumn}>+ Column</button>
       <button onClick={onRemoveClick}>X</button>
       <Grabber title="Move Row" {...listeners} />
-
-      <DndContext
-        collisionDetection={collisionStrategy} 
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always, } }}
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragOver={handleDragOver}
-      >
         <div style={{ display: "flex", flexDirection: "row" }}>
           {
             Object.entries(columns).map(([ name, items ]) => (
               <Column
-                onRemoveClick={removeColumn(name)}
-                onRemoveItem={removeItem(name)}
-                onAddItem={addItem(name)}
+                onRemoveClick={onRemoveColumn?.(name)}
+                onAddItem={onAddItem?.(name)}
+                onRemoveItem={onRemoveItem?.(name)}
                 items={items}
                 name={name}
                 key={name}
@@ -316,7 +288,6 @@ export const Row = ({ id, onRemoveClick, }) => {
             ))
           }
         </div>
-      </DndContext>
     </div>
   )
 }

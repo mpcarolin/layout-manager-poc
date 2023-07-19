@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -12,40 +12,278 @@ import {
 } from "@dnd-kit/sortable";
 import { useSortable, arrayMove, } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { nanoid } from "nanoid";
 import { useBasicSortableCollisionStrategy } from "./collisionDetectionStrategies.ts";
 import { Row } from "./Row.tsx";
 import { Grabber } from "./Grabber.tsx";
-
-
+import {
+  generateColumn,
+  generateRow,
+  generateItemId,
+  getPath,
+  Path,
+} from "./helpers.ts";
 
 const useRows = () => {
-  const [ rows, setRows ] = useState([ nanoid(3), nanoid(3) ]);
+  const [ rows, setRows ] = useState<Row[]>([ generateRow(), generateRow() ]);
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const rowIds = rows.map(row => row.rowId);
+  const recentlyMovedToNewContainerRef = useRef(false);
+
+  const findPath = (id: string): undefined | Path => {
+    for (const row of rows) {
+      const result = getPath(row, id)
+      if (!result) continue;
+      return result;
+    }
+  }
 
   /**
    *
    * LIFECYCLE FUNCTIONS
    *
    */
+
+  const handleDragStart = ({ active }) => {
+    setActiveId(active.id);
+  }
+
+  // Callback that runs when user lets go of mouse button after dragging
+  // a draggable somewhere. By the time this runs, both active and over should
+  // either be items in the same column, or over is not an item at all.
+  //
+  // This callback is really only meaningful when moving elements within the
+  // same column. You can replace this with an empty function, and the POC
+  // will still work for moving items between columns, but it will bug out 
+  // when moving an item within the same column.
   const handleDragEnd = ({ active, over }) => {
-    if (active.id !== over.id) {
-      setRows((items: string[]) => {
-        const oldIndex = items.indexOf(active.id);
-        const newIndex = items.indexOf(over.id);
-        
-        return arrayMove(items, oldIndex, newIndex);
-      });
+    // find the column in which the active element currently resides
+    const activePath = findPath(active.id);
+    const overPath = findPath(over.id);
+
+    if (!activePath || !overPath)
+      return setActiveId(null);
+
+    // check if we are just moving rows around
+    if (activePath.isRowMove) {
+      console.log("isRowMove")
+      if (activePath.rowId !== overPath.rowId) {
+        setRows((items: Row[]) => {
+          const oldIndex = items.findIndex(row => row.rowId === active.id);
+          const newIndex = items.findIndex(row => row.rowId === over.id);
+          
+          return arrayMove(items, oldIndex, newIndex);
+        });
+      }
+    } else if (!activePath?.columnId) {
+      // if we aren't doing a row move, but no columns are present, then just short circuit out
+      return setActiveId(null);
+    }
+
+    // check if we are moving items around in the same column
+    if (activePath.isItemMove) {
+      console.log("itemMove")
+      const rowIndex = rows.findIndex(row => row.rowId === activePath.rowId);
+
+      const column = rows[rowIndex]?.columns[activePath.columnId as string];
+
+      // same column
+      const activeIndexInColumn = column.indexOf(activePath.itemId as string);
+      const overIndexInColumn = column.indexOf(overPath.itemId as string);
+
+
+      setRows(rows => [
+        ...rows.slice(0, rowIndex),
+        {
+          ...rows[rowIndex],
+          columns: {
+            ...rows[rowIndex].columns,
+            [activePath.columnId as string]: arrayMove(
+              rows[rowIndex].columns[activePath.columnId as string],
+              activeIndexInColumn,
+              overIndexInColumn
+            )
+          }
+        },
+        ...rows.slice(rowIndex + 1),
+      ])
+    }
+
+    setActiveId(null);
+  }
+
+  // Callback that runs as the user is dragging a draggable over another element
+  // tracked by the dnd context. This actually updates the state so that 
+  // the active element resides in the "over" container while dragging.
+  //
+  // This is only meaningful when moving elements to a different column. If you replace
+  // this with an empty function, the POC will work fine for moving items within the 
+  // same column, btu bug out when moving to a different one.
+  const handleDragOver = ({ active, over }) => {
+    // find the column in which the active element currently resides
+    const activePath = findPath(active.id);
+    if (!activePath) return;
+
+    const overPath = findPath(over.id);
+    if (!overPath) return;
+
+    if (activePath.isRowMove) return;
+    if (overPath.isRowMove) return;
+
+    // we need to be working with items in columns. If we aren't, short circuit
+    if (!activePath.isItemMove) return
+
+    if (activePath.columnId !== overPath.columnId) {
+      setRows(rows => {
+        const sourceRowIdx = rows.findIndex(row => row.rowId === activePath.rowId);
+        console.log({ activePath, overPath, rows, sourceRowIdx })
+        const sourceRow = {
+          ...rows[sourceRowIdx],
+          columns: {
+            ...rows[sourceRowIdx].columns,
+            // remove active item from source row column
+            [activePath.columnId as string]: rows[sourceRowIdx].columns[activePath.columnId as string].filter((item: string) => item && item !== activePath.itemId)
+          }
+        }
+
+        const destinationRowIdx = rows.findIndex(row => row.rowId === overPath.rowId);
+        const destinationColumn = rows[destinationRowIdx].columns[overPath.columnId as string];
+
+        // compute index of active item to be placed into over column
+        let newIndex: number;
+        if (overPath.isColumnMove) { // if moving over to a new column without a specific spot
+          newIndex = destinationColumn.length + 1;
+        } else if (overPath.isItemMove) {
+          // determine the right index depending on if active is above or below the over item
+          const isBelowOverItem =
+            over &&
+            active.rect.current.translated &&
+            active.rect.current.translated.top > over.rect.top + over.rect.height;
+
+          const modifier = isBelowOverItem ? 1 : 0;
+
+          const overIndex = destinationColumn.indexOf(overPath.itemId as string);
+
+          newIndex =
+            overIndex >= 0 ? (overIndex + modifier) : (destinationColumn.length + 1);
+        } else {
+          throw new Error("Shouldnt be here.")
+        }
+
+        recentlyMovedToNewContainerRef.current = true;
+
+        // update destination row with the active item at the specified index
+        const destinationRow: Row = {
+          ...rows[destinationRowIdx],
+          // add active item to over row column
+          columns: {
+            ...rows[destinationRowIdx].columns,
+            [overPath.columnId as string]: [
+              ...destinationColumn.slice(0, newIndex),
+              activePath.itemId as string,
+              ...destinationColumn.slice(newIndex)
+            ]
+          }
+        }
+
+        const newRows = [ ...rows ];
+        if (sourceRowIdx === destinationRowIdx) {
+          newRows[sourceRowIdx] = {
+            ...sourceRow,
+            columns: {
+              ...rows[destinationRowIdx].columns,
+              [overPath.columnId as string]: [
+                ...destinationColumn.slice(0, newIndex),
+                activePath.itemId as string,
+                ...destinationColumn.slice(newIndex)
+              ],
+              [activePath.columnId as string]: rows[sourceRowIdx].columns[activePath.columnId as string].filter((item: string) => item && item !== activePath.itemId)
+            }
+          }
+        } else {
+          newRows[sourceRowIdx] = sourceRow;
+          newRows[destinationRowIdx] = destinationRow;
+        }
+
+        console.log({ newRows, destinationRow, sourceRow })
+        return newRows;
+      })
     }
   }
 
-  const addRow = () => setRows(rows => [ ...rows, nanoid(3) ]);
-  const removeRow = (id: string) => () => setRows(rows => rows.filter(name => id !== name));
+
+  const addRow = () => setRows(rows => [ ...rows, generateRow() ]);
+  const removeRow = (id: string) => () => setRows(rows => rows.filter(row => row.rowId !== id));
+
+  const addColumn = (rowId: string) => () => setRows(rows => {
+    return rows.map(row => {
+      return (row.rowId === rowId)
+        ? { 
+          ...row,
+          columns: {
+            ...row.columns,
+            ...generateColumn()
+          }
+        }
+        : row
+    })
+  });
+
+  const removeColumn = (rowId: string) => (columnId: string) => () => setRows(rows => {
+    return rows.map(row => {
+      if (row.rowId !== rowId) return row;
+      const { [columnId]: removedColumn, ...columns } = row.columns;
+      return { ...row, columns };
+    });
+  });
+
+  const addItem = (rowId: string) => (columnId: string) => () => {
+    setRows(rows => {
+      return rows.map(row => {
+        if (row.rowId !== rowId) return row;
+        return {
+          ...row,
+          columns: {
+            ...row.columns,
+            [columnId]: [ ...row.columns[columnId], generateItemId(columnId) ]
+          }
+        }
+      })
+    })
+  }
+
+  const removeItem = (rowId: string) => (columnId: string) => (itemId: string) => () => {
+    setRows(rows => {
+      return rows.map(row => {
+        if (row.rowId !== rowId) return row;
+        return {
+          ...row,
+          columns: {
+            ...row.columns,
+            [columnId]: row.columns[columnId].filter(item => item !== itemId)
+          }
+        }
+      })
+    })
+  }
+
 
   return { 
     rows,
+    rowIds,
+    activeId,
+    handleDragStart,
+    handleDragOver,
     handleDragEnd,
+
     addRow,
     removeRow,
+
+    addColumn,
+    removeColumn,
+
+    addItem,
+    removeItem
   }
 }
 
@@ -57,9 +295,20 @@ export const Section = ({ title, id }) => {
 
   const {
     rows,
+    rowIds,
+
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+
     addRow,
     removeRow,
-    handleDragEnd,
+
+    addColumn,
+    removeColumn,
+
+    addItem,
+    removeItem
   } = useRows();
 
   const {
@@ -87,19 +336,26 @@ export const Section = ({ title, id }) => {
       <DndContext
         collisionDetection={collisionStrategy} 
         sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={rows}
+          items={rowIds}
           strategy={verticalListSortingStrategy}
         >
           <div style={{ display: "flex", flexDirection: "column" }}>
             {
-              rows.map(name => (
+              rows.map(row => (
                 <Row
-                  key={name}
-                  id={name}
-                  onRemoveClick={removeRow(name)}
+                  key={row.rowId}
+                  id={row.rowId}
+                  columns={row.columns}
+                  onRemoveClick={removeRow(row.rowId)}
+                  onAddColumn={addColumn(row.rowId)}
+                  onRemoveColumn={removeColumn(row.rowId)}
+                  onAddItem={addItem(row.rowId)}
+                  onRemoveItem={removeItem(row.rowId)}
                 />
               ))
             }
