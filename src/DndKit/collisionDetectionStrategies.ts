@@ -19,8 +19,8 @@ export const useBasicSortableCollisionStrategy = () => closestCenter;
  * - If there are none, find intersecting containers with the active draggable.
  * - If there are no intersecting containers, return the last matched intersection
  *
- * This is taken mostly verbatim from the dndkit multiple containers story, but made into
- * a custom hook and w/ some variables renamed for my own sanity
+ * The algorithm here is mostly sourced from the multiple containers story in dndkit repo, but
+ * modified for our use case, which includes two levels of nesting of containers (rows and columns)
  */
 export const useMultipleContainerCollisionDetectionStrategy = ({
   activeId,
@@ -37,12 +37,10 @@ export const useMultipleContainerCollisionDetectionStrategy = ({
 
   const rowIds = items.map(row => row.rowId);
   const columnIds = items.map(row => Object.keys(row.columns)).flat();
-  const droppableIds = [ ...rowIds, ...columnIds ];
-
-  const activePath = findPath(activeId);
 
   return React.useCallback(
     (args) => {
+      const droppableIds = [ ...rowIds, ...columnIds ];
       if (activeId && (droppableIds.includes(activeId))) {
         return closestCenter({
           ...args,
@@ -103,7 +101,7 @@ export const useMultipleContainerCollisionDetectionStrategy = ({
               // If no droppable is matched, return the last match
               return lastOverIdRef.current ? [{id: lastOverIdRef.current}] : [];
     },
-    [ activeId, lastOverIdRef, recentlyMovedToNewContainerRef, droppableIds, findPath ]
+    [ items, columnIds, rowIds, activeId, lastOverIdRef, recentlyMovedToNewContainerRef, findPath ]
   ) };
 
 

@@ -13,14 +13,10 @@ import {
 } from "@dnd-kit/sortable";
 import { useSortable, arrayMove, } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  useBasicSortableCollisionStrategy,
-  useMultipleContainerCollisionDetectionStrategy
-} from "./collisionDetectionStrategies.ts";
+import { useMultipleContainerCollisionDetectionStrategy } from "./collisionDetectionStrategies.ts";
 import { Row } from "./Row.tsx";
 import { Grabber } from "./Grabber.tsx";
 import {
-  Columns,
   generateColumn,
   generateRow,
   generateItemId,
@@ -42,6 +38,9 @@ const useRows = () => {
    *
    */
 
+  // Callback that runs when the user begins dragging a draggable.
+  // All we're doing here is setting the active draggable id.
+  // This is significant primarily for the collision detection strategy.
   const handleDragStart = ({ active }) => {
     setActiveId(active.id);
   }
