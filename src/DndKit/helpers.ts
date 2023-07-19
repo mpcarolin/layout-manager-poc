@@ -5,6 +5,9 @@ export type Path = {
   columnId?: string
   itemId?: string
 
+  row: RowType,
+  column?: string[],
+
   isRowMove?: boolean
   isColumnMove?: boolean
   isItemMove?: boolean
@@ -53,6 +56,7 @@ export const getPath = (row: RowType, id: string): Path | undefined => {
   if (row.rowId === id) 
     return ({
       rowId: id,
+      row,
       isRowMove: true
     });
 
@@ -61,7 +65,9 @@ export const getPath = (row: RowType, id: string): Path | undefined => {
   if (matchingColumnId) {
     return {
       rowId: row.rowId,
+      row,
       columnId: matchingColumnId,
+      column: row.columns[matchingColumnId],
       isColumnMove: true
     }
   }
@@ -70,7 +76,9 @@ export const getPath = (row: RowType, id: string): Path | undefined => {
     if (items.includes(id)) {
       return {
         rowId: row.rowId,
+        row,
         columnId,
+        column: row.columns[matchingColumnId],
         itemId: id,
         isItemMove: true
       }
@@ -78,3 +86,10 @@ export const getPath = (row: RowType, id: string): Path | undefined => {
   }
 }
 
+export const findPath = (rows: RowType[]) => (id: string): undefined | Path => {
+  for (const row of rows) {
+    const result = getPath(row, id)
+    if (!result) continue;
+    return result;
+  }
+}

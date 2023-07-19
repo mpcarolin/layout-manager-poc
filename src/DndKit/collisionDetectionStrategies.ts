@@ -8,6 +8,8 @@ import {
   UniqueIdentifier,
 } from "@dnd-kit/core";
 
+import { findPath as getFindPath, RowType } from "./helpers.ts";
+
 export const useBasicSortableCollisionStrategy = () => closestCenter;
 
 /**
@@ -26,18 +28,26 @@ export const useMultipleContainerCollisionDetectionStrategy = ({
   recentlyMovedToNewContainerRef
 }: {
   activeId: string,
-  items: string[],
+  items: RowType[],
   recentlyMovedToNewContainerRef: React.RefObject<boolean>
 }): CollisionDetection => { 
   const lastOverIdRef = useRef<UniqueIdentifier | null>(null);
 
+  const findPath = getFindPath(items);
+
+  const rowIds = items.map(row => row.rowId);
+  const columnIds = items.map(row => Object.keys(row.columns)).flat();
+  const droppableIds = [ ...rowIds, ...columnIds ];
+
+  const activePath = findPath(activeId);
+
   return React.useCallback(
     (args) => {
-      if (activeId && activeId in items) {
+      if (activeId && (droppableIds.includes(activeId))) {
         return closestCenter({
           ...args,
           droppableContainers: args.droppableContainers.filter(
-            (container) => container.id in items
+            (container) => droppableIds.includes(container.id)
           ),
         });
       }
@@ -51,9 +61,17 @@ export const useMultipleContainerCollisionDetectionStrategy = ({
               : rectIntersection(args);
               let overId = getFirstCollision(intersections, 'id');
 
+              const overPath = findPath(overId);
+
               if (overId != null) {
-                if (overId in items) {
-                  const containerItems = items[overId];
+                if (droppableIds.includes(overId)) {
+
+                  const containerItems = overPath.isRowMove
+                    ? [ ...Object.values(overPath.row.columns) ].flat()
+                    : overPath.isColumnMove
+                      ? overPath.column
+                      : [];
+                      
 
                   // If a container is matched and it contains items (columns 'A', 'B', 'C')
                   if (containerItems.length > 0) {
@@ -85,7 +103,7 @@ export const useMultipleContainerCollisionDetectionStrategy = ({
               // If no droppable is matched, return the last match
               return lastOverIdRef.current ? [{id: lastOverIdRef.current}] : [];
     },
-    [ activeId, items, lastOverIdRef, recentlyMovedToNewContainerRef ]
+    [ activeId, lastOverIdRef, recentlyMovedToNewContainerRef, droppableIds, findPath ]
   ) };
 
 

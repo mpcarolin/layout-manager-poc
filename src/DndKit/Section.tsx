@@ -4,6 +4,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 
 import {
@@ -12,15 +13,18 @@ import {
 } from "@dnd-kit/sortable";
 import { useSortable, arrayMove, } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useBasicSortableCollisionStrategy } from "./collisionDetectionStrategies.ts";
+import {
+  useBasicSortableCollisionStrategy,
+  useMultipleContainerCollisionDetectionStrategy
+} from "./collisionDetectionStrategies.ts";
 import { Row } from "./Row.tsx";
 import { Grabber } from "./Grabber.tsx";
 import {
+  Columns,
   generateColumn,
   generateRow,
   generateItemId,
-  getPath,
-  Path,
+  findPath as getFindPath
 } from "./helpers.ts";
 
 const useRows = () => {
@@ -30,13 +34,7 @@ const useRows = () => {
   const rowIds = rows.map(row => row.rowId);
   const recentlyMovedToNewContainerRef = useRef(false);
 
-  const findPath = (id: string): undefined | Path => {
-    for (const row of rows) {
-      const result = getPath(row, id)
-      if (!result) continue;
-      return result;
-    }
-  }
+  const findPath = getFindPath(rows);
 
   /**
    *
@@ -52,9 +50,9 @@ const useRows = () => {
   // a draggable somewhere. By the time this runs, both active and over should
   // either be items in the same column, or over is not an item at all.
   //
-  // This callback is really only meaningful when moving elements within the
+  // This callback is mostly only meaningful when moving elements within the
   // same column. You can replace this with an empty function, and the POC
-  // will still work for moving items between columns, but it will bug out 
+  // will mostly still work for moving items between columns, but it will bug out 
   // when moving an item within the same column.
   const handleDragEnd = ({ active, over }) => {
     // find the column in which the active element currently resides
@@ -66,7 +64,6 @@ const useRows = () => {
 
     // check if we are just moving rows around
     if (activePath.isRowMove) {
-      console.log("isRowMove")
       if (activePath.rowId !== overPath.rowId) {
         setRows((items: Row[]) => {
           const oldIndex = items.findIndex(row => row.rowId === active.id);
@@ -82,7 +79,6 @@ const useRows = () => {
 
     // check if we are moving items around in the same column
     if (activePath.isItemMove) {
-      console.log("itemMove")
       const rowIndex = rows.findIndex(row => row.rowId === activePath.rowId);
 
       const column = rows[rowIndex]?.columns[activePath.columnId as string];
@@ -116,9 +112,9 @@ const useRows = () => {
   // tracked by the dnd context. This actually updates the state so that 
   // the active element resides in the "over" container while dragging.
   //
-  // This is only meaningful when moving elements to a different column. If you replace
-  // this with an empty function, the POC will work fine for moving items within the 
-  // same column, btu bug out when moving to a different one.
+  // This is mostly meaningful for moving elements to a different column. If you replace
+  // this with an empty function, the POC will mostly work fine for moving items within the 
+  // same column, but bug out when moving to a different one.
   const handleDragOver = ({ active, over }) => {
     // find the column in which the active element currently resides
     const activePath = findPath(active.id);
@@ -136,7 +132,6 @@ const useRows = () => {
     if (activePath.columnId !== overPath.columnId) {
       setRows(rows => {
         const sourceRowIdx = rows.findIndex(row => row.rowId === activePath.rowId);
-        console.log({ activePath, overPath, rows, sourceRowIdx })
         const sourceRow = {
           ...rows[sourceRowIdx],
           columns: {
@@ -237,36 +232,30 @@ const useRows = () => {
     });
   });
 
-  const addItem = (rowId: string) => (columnId: string) => () => {
+  const updateItems = (rowId: string, columnId: string, columnSetter: ((columns: string[]) => string[])) => {
     setRows(rows => {
       return rows.map(row => {
         if (row.rowId !== rowId) return row;
+        if (!(columnId in row.columns)) return row;
         return {
           ...row,
           columns: {
             ...row.columns,
-            [columnId]: [ ...row.columns[columnId], generateItemId(columnId) ]
+            [columnId]: columnSetter(row.columns[columnId])
           }
         }
       })
     })
+    
+  }
+
+  const addItem = (rowId: string) => (columnId: string) => () => {
+    updateItems(rowId, columnId, columns => [ ...columns, generateItemId(columnId) ]);
   }
 
   const removeItem = (rowId: string) => (columnId: string) => (itemId: string) => () => {
-    setRows(rows => {
-      return rows.map(row => {
-        if (row.rowId !== rowId) return row;
-        return {
-          ...row,
-          columns: {
-            ...row.columns,
-            [columnId]: row.columns[columnId].filter(item => item !== itemId)
-          }
-        }
-      })
-    })
+    updateItems(rowId, columnId, columns => columns.filter(item => item !== itemId));
   }
-
 
   return { 
     rows,
@@ -275,6 +264,7 @@ const useRows = () => {
     handleDragStart,
     handleDragOver,
     handleDragEnd,
+    recentlyMovedToNewContainerRef,
 
     addRow,
     removeRow,
@@ -291,11 +281,11 @@ const useRows = () => {
 export const Section = ({ title, id }) => {
   const sensors = useSensors(useSensor(PointerSensor));
 
-  const collisionStrategy = useBasicSortableCollisionStrategy();
-
   const {
     rows,
     rowIds,
+    activeId,
+    recentlyMovedToNewContainerRef,
 
     handleDragStart,
     handleDragOver,
@@ -319,6 +309,12 @@ export const Section = ({ title, id }) => {
     transition
   } = useSortable({ id });
 
+  const collisionStrategy = useMultipleContainerCollisionDetectionStrategy({
+    activeId,  
+    recentlyMovedToNewContainerRef,
+    items: rows
+  });
+
   const style = {
     backgroundColor: "gray",
     border: "solid 1px black",
@@ -335,6 +331,11 @@ export const Section = ({ title, id }) => {
       <Grabber title="Move Section" {...listeners} />
       <DndContext
         collisionDetection={collisionStrategy} 
+        measuring={{
+          droppable: {
+            strategy: MeasuringStrategy.Always,
+          },
+        }}
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
