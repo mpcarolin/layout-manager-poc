@@ -52,6 +52,7 @@ export const generateRow = (): RowType => ({
   },
 })
 
+// Gets the path to the id in the row
 export const getPath = (row: RowType, id: string): Path | undefined => {
   if (row.rowId === id) 
     return ({
@@ -86,6 +87,7 @@ export const getPath = (row: RowType, id: string): Path | undefined => {
   }
 }
 
+// Finds the path to the object with the id in the rows.
 export const findPath = (rows: RowType[]) => (id: string): undefined | Path => {
   for (const row of rows) {
     const result = getPath(row, id)
